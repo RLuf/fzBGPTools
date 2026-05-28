@@ -4,7 +4,10 @@ import os
 class Database:
     def __init__(self, db_path=None):
         if db_path is None:
-            config_dir = os.path.expanduser("~/.config/fzbgptools")
+            if os.name == 'nt':
+                config_dir = os.path.join(os.environ.get('APPDATA', os.path.expanduser("~")), "fzbgptools")
+            else:
+                config_dir = os.path.expanduser("~/.config/fzbgptools")
             os.makedirs(config_dir, exist_ok=True)
             db_path = os.path.join(config_dir, "fzbgptools.db")
         self.db_path = db_path

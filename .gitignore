@@ -1,0 +1,21 @@
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+build/
+dist/
+*.spec
+
+# SQLite databases
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db

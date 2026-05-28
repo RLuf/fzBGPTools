@@ -57,21 +57,27 @@ const SSH_OUTPUT = (host) => [
   { cls: "ok",   text: `[${host.user}@${host.hostname}] >` },
 ];
 
+// Stats parseados da saída de ping (mock; em runtime real virá do regex no Python)
+const PING_STATS = { loss: "0%", min: "3.92", avg: "4.07", max: "4.21" };
+
 function PingTab() {
   const [target, setTarget] = useState("8.8.8.8");
   const [running, setRunning] = useState(false);
   const [lines, setLines] = useState([]);
+  const [stats, setStats] = useState(null);
 
   const run = () => {
-    setRunning(true); setLines([{ cls: "dim", text: `$ ping -c 7 ${target}` }]);
+    setRunning(true); setLines([{ cls: "dim", text: `$ ping -c 7 ${target}` }]); setStats(null);
     const out = PING_OUTPUT(target);
     out.forEach((ln, i) => {
       setTimeout(() => {
         setLines(prev => [...prev, ln]);
-        if (i === out.length - 1) setRunning(false);
+        if (i === out.length - 1) { setRunning(false); setStats(PING_STATS); }
       }, 120 + i * 130);
     });
   };
+
+  const lossClass = !stats ? "dim" : parseFloat(stats.loss) === 0 ? "ok" : parseFloat(stats.loss) < 25 ? "warn" : "err";
 
   return (
     <div>
@@ -80,14 +86,35 @@ function PingTab() {
         <select className="select" style={{ width: 140 }}><option>7 pacotes</option><option>10 pacotes</option><option>30 pacotes</option><option>Contínuo</option></select>
         <button className="btn btn-primary" onClick={run} disabled={running}><Icon name="play" size={12}/>Executar</button>
       </div>
+
+      {/* Stats cards — perda, RTT min / avg / max */}
+      <div className="tool-stats">
+        <div className="tool-stat">
+          <div className="lbl">Perda</div>
+          <div className={"val " + lossClass}>{stats ? stats.loss : "—"}</div>
+        </div>
+        <div className="tool-stat">
+          <div className="lbl">RTT mín</div>
+          <div className={"val " + (stats ? "ok" : "dim")}>{stats ? stats.min + " ms" : "—"}</div>
+        </div>
+        <div className="tool-stat">
+          <div className="lbl">RTT avg</div>
+          <div className={"val " + (stats ? "info" : "dim")}>{stats ? stats.avg + " ms" : "—"}</div>
+        </div>
+        <div className="tool-stat">
+          <div className="lbl">RTT máx</div>
+          <div className={"val " + (stats ? "warn" : "dim")}>{stats ? stats.max + " ms" : "—"}</div>
+        </div>
+      </div>
+
       <div className="card card-tight">
         <div className="term-bar">
           <div className="dot-r"></div><div className="dot-y"></div><div className="dot-g"></div>
           <div className="term-title">~/ping {target}</div>
           <div style={{ flex: 1 }}></div>
-          {running ? <span className="badge badge-green"><span className="ix-dot"></span>executando</span> : <span className="badge badge-gray">pronto</span>}
+          {running ? <span className="badge badge-green"><span className="ix-dot"></span>executando</span> : stats ? <span className="badge badge-green"><span className="ix-dot"></span>concluído</span> : <span className="badge badge-gray">pronto</span>}
         </div>
-        <div className="term" style={{ minHeight: 360, borderRadius: 0, border: "none" }}>
+        <div className="term" style={{ minHeight: 320, borderRadius: 0, border: "none" }}>
           {lines.length === 0 && <span className="dim">{`// Resultados aparecerão aqui após executar.`}</span>}
           {lines.map((l, i) => (<span key={i} className={"ln " + l.cls}>{l.text || "\u00A0"}</span>))}
           {running && <span className="cursor"></span>}
@@ -112,12 +139,24 @@ function TracerouteTab() {
     });
   };
 
+  const ixCount = hops.filter(h => h.ix).length;
+
   return (
     <div>
       <div className="tool-input-row" style={{ marginBottom: 14 }}>
         <input className="input" placeholder="IP ou hostname destino" value={target} onChange={(e) => setTarget(e.target.value)}/>
         <select className="select" style={{ width: 160 }}><option>ICMP</option><option>UDP</option><option>TCP/443</option></select>
         <button className="btn btn-primary" onClick={run} disabled={running}><Icon name="play" size={12}/>Executar</button>
+      </div>
+
+      {/* Barra de status — hop count + IX/PTT count + estado */}
+      <div className="tool-statusbar">
+        <span>{running ? `Sondando hops até ${target}…` : hops.length > 0 ? `Traceroute concluído — destino: ${target}` : "Aguardando execução."}</span>
+        <div className="right">
+          <span className="badge badge-gray">{hops.length} hops</span>
+          <span className="badge badge-purple"><span className="ix-dot"></span>{ixCount} IX/PTT</span>
+          {running && <span className="badge badge-green"><span className="ix-dot"></span>executando</span>}
+        </div>
       </div>
       <div className="table-wrap">
         <table className="t">

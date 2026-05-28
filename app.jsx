@@ -10,6 +10,89 @@ const SCREEN_TITLES = {
   settings:  { crumb: "Sistema", page: "Configurações" },
 };
 
+// Mock alerts — em runtime real virá da tabela `alerts` do SQLite
+const TOPBAR_ALERTS = [
+  { id: 1, sev: "critical", title: "Prepend detection",
+    desc: "AS174 está fazendo AS-Path prepend (3x) em 200.149.0.0/16",
+    time: "há 3 min" },
+  { id: 2, sev: "critical", title: "Route flapping",
+    desc: "Prefixo 187.45.128.0/19 oscilou 8 vezes em 15 min via AS12956",
+    time: "há 7 min" },
+  { id: 3, sev: "warn",     title: "MED change",
+    desc: "Telefônica alterou MED de 100 → 250 em 17 prefixos",
+    time: "há 12 min" },
+];
+
+function AlertsButton() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const count = TOPBAR_ALERTS.length;
+  const criticalCount = TOPBAR_ALERTS.filter(a => a.sev === "critical").length;
+  const hasCritical = criticalCount > 0;
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="alerts-wrap" ref={ref}>
+      <button
+        className={"alerts-btn" + (hasCritical ? " has-critical" : "") + (open ? " is-open" : "")}
+        title={`${count} alerta${count !== 1 ? "s" : ""}`}
+        onClick={() => setOpen(o => !o)}>
+        <Icon name="bell" size={16}/>
+        {count > 0 && <span className="alerts-count">{count > 99 ? "99+" : count}</span>}
+      </button>
+
+      {open && (
+        <div className="alerts-dropdown">
+          <div className="alerts-head">
+            <Icon name="bell" size={14}/>
+            <span>Alertas BGP</span>
+            <span className="badge badge-red" style={{ marginLeft: "auto" }}>
+              {criticalCount} crítico{criticalCount !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="alerts-list">
+            {TOPBAR_ALERTS.map(a => (
+              <div key={a.id} className={"alerts-item sev-" + a.sev}>
+                <div className={"alerts-ico " + a.sev}>
+                  <Icon name="alert" size={14}/>
+                </div>
+                <div className="alerts-body">
+                  <div className="alerts-title">{a.title}</div>
+                  <div className="alerts-desc">{a.desc}</div>
+                  <div className="alerts-time">{a.time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="alerts-foot">
+            <button className="btn btn-sm btn-ghost" onClick={() => setOpen(false)}>
+              Marcar tudo como lido
+            </button>
+            <button className="btn btn-sm btn-primary"
+                    onClick={() => { setOpen(false); /* navegar p/ dashboard */ }}>
+              Ver no Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "theme": "aurora",
   "density": "comfortable",
@@ -32,16 +115,7 @@ function App() {
           <div className="spacer"></div>
           <Search value="" onChange={() => {}} placeholder="Buscar ASN, IP, hostname..." width={320}/>
           <span className="kbd">⌘K</span>
-          <button className="icon-btn" title="Alertas">
-            <div style={{ position: "relative" }}>
-              <Icon name="bell" size={16}/>
-              <span style={{
-                position: "absolute", top: -4, right: -4,
-                width: 8, height: 8, borderRadius: "50%",
-                background: "var(--red)", boxShadow: "0 0 8px var(--red)"
-              }}></span>
-            </div>
-          </button>
+          <AlertsButton/>
           <button className="icon-btn" title="Atualizar"><Icon name="refresh" size={16}/></button>
         </div>
 

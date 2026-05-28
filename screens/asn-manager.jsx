@@ -148,7 +148,16 @@ function AsnModal({ initial, onClose, onSave }) {
         <Field label="Número ASN"><input className="input" placeholder="263870" value={f.asn} onChange={(e) => set("asn", e.target.value)}/></Field>
         <Field label="País">
           <select className="select" value={f.country} onChange={(e) => set("country", e.target.value)}>
-            <option>BR</option><option>US</option><option>ES</option><option>AR</option><option>CL</option><option>DE</option>
+            <option value="BR">🇧🇷 Brasil</option>
+            <option value="US">🇺🇸 Estados Unidos</option>
+            <option value="ES">🇪🇸 Espanha</option>
+            <option value="AR">🇦🇷 Argentina</option>
+            <option value="CL">🇨🇱 Chile</option>
+            <option value="DE">🇩🇪 Alemanha</option>
+            <option value="FR">🇫🇷 França</option>
+            <option value="UK">🇬🇧 Reino Unido</option>
+            <option value="PT">🇵🇹 Portugal</option>
+            <option value="JP">🇯🇵 Japão</option>
           </select>
         </Field>
       </div>

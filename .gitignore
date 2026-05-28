@@ -1,21 +1,38 @@
-# Python build artifacts
+# ─── Python ───
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+*.egg-info/
+*.egg
 .Python
 env/
-venv/
 .venv/
+venv/
+.pytest_cache/
 pip-log.txt
 pip-delete-this-directory.txt
-build/
+
+# ─── PyInstaller / Builds ───
+build/work/
+build/__pycache__/
 dist/
-*.spec
+*.spec.bak
 
-# SQLite databases
-*.db
-
-# OS files
+# ─── OS ───
 .DS_Store
 Thumbs.db
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.sublime-*
+
+# ─── Logs / DB locais ───
+*.db
+*.log
+~/.config/fzbgptools/
+
+# ─── Antigravity scratch ───
+/home/rluft/.gemini/
+/tmp/fzbgptools-*/

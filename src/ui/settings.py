@@ -1,19 +1,59 @@
-"""Settings — DB backup/restore/reset + About panel with version info."""
+"""Settings — DB backup/restore/reset + SMTP email configuration + Help + About panel."""
 import os
 import shutil
 import sys
+import smtplib
+from email.mime.text import MIMEText
+
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-                              QFileDialog, QMessageBox, QGridLayout)
-from PyQt5.QtCore import Qt
+                               QFileDialog, QMessageBox, QGridLayout, QTabWidget, QLineEdit,
+                               QSpinBox, QCheckBox, QFormLayout, QScrollArea)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
 from src.ui.widgets import page_header, badge
 from src.version import __version__, __app_name__, __description__, __author__, __url__
+
+
+class SmtpTestWorker(QThread):
+    finished = pyqtSignal(bool, str)
+
+    def __init__(self, host, port, user, pwd, ssl, to_email):
+        super().__init__()
+        self.host = host
+        self.port = port
+        self.user = user
+        self.pwd = pwd
+        self.ssl = ssl
+        self.to_email = to_email
+
+    def run(self):
+        try:
+            msg = MIMEText("Conectividade de alerta SMTP do fzBGPTools configurada com sucesso!")
+            msg['Subject'] = "Teste de Alerta SMTP — fzBGPTools"
+            msg['From'] = self.user or "alerta@fzgptools.local"
+            msg['To'] = self.to_email
+
+            if self.ssl:
+                server = smtplib.SMTP_SSL(self.host, self.port, timeout=10)
+            else:
+                server = smtplib.SMTP(self.host, self.port, timeout=10)
+                server.starttls()
+
+            if self.user and self.pwd:
+                server.login(self.user, self.pwd)
+
+            server.sendmail(self.user or "alerta@fzgptools.local", [self.to_email], msg.as_string())
+            server.quit()
+            self.finished.emit(True, "E-mail de teste enviado com sucesso!")
+        except Exception as e:
+            self.finished.emit(False, str(e))
 
 
 class SettingsScreen(QWidget):
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self.db = db
+        self.smtp_worker = None
         self._init_ui()
 
     def _init_ui(self):
@@ -23,9 +63,32 @@ class SettingsScreen(QWidget):
 
         layout.addWidget(page_header(
             "System", "Settings",
-            "Gerenciamento do banco de dados, backups e informações da aplicação."))
+            "Configurações gerais do sistema, SMTP de alertas, banco de dados local e ajuda."))
 
-        # ── Card 1: Database ──
+        self.tabs = QTabWidget()
+        
+        # 1. Tab Database
+        self.tabs.addTab(self._build_db_tab(), "Banco de Dados")
+        
+        # 2. Tab SMTP Config
+        self.tabs.addTab(self._build_smtp_tab(), "Configurações SMTP")
+        
+        # 3. Tab Help
+        self.tabs.addTab(self._build_help_tab(), "Ajuda")
+        
+        # 4. Tab About
+        self.tabs.addTab(self._build_about_tab(), "Sobre")
+
+        layout.addWidget(self.tabs)
+        self.update_db_size()
+
+    # ─── DATABASE TAB ───
+    def _build_db_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(16)
+
         db_card = QFrame()
         db_card.setObjectName("Card")
         dl = QVBoxLayout(db_card)
@@ -74,16 +137,217 @@ class SettingsScreen(QWidget):
         actions.addStretch()
         dl.addLayout(actions)
 
-        layout.addWidget(db_card)
+        lay.addWidget(db_card)
+        lay.addStretch()
+        return w
 
-        # ── Card 2: About ──
+    # ─── SMTP TAB ───
+    def _build_smtp_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(16)
+
+        card = QFrame()
+        card.setObjectName("Card")
+        cl = QVBoxLayout(card)
+        cl.setContentsMargins(20, 18, 20, 18)
+        cl.setSpacing(14)
+
+        title = QLabel("CONFIGURAÇÃO DE EMAIL DE ALERTA (SMTP)")
+        title.setStyleSheet("font-size: 11px; color: #6b7693; font-weight: 700; letter-spacing: 0.14em;")
+        cl.addWidget(title)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+        form.setLabelAlignment(Qt.AlignLeft)
+
+        self.smtp_host = QLineEdit()
+        self.smtp_host.setPlaceholderText("ex: smtp.webstorage.com.br")
+        
+        self.smtp_port = QSpinBox()
+        self.smtp_port.setRange(1, 65535)
+        self.smtp_port.setValue(587)
+        self.smtp_port.setStyleSheet("min-width: 100px;")
+
+        self.smtp_user = QLineEdit()
+        self.smtp_user.setPlaceholderText("ex: alerta@webstorage.com.br")
+
+        self.smtp_pass = QLineEdit()
+        self.smtp_pass.setEchoMode(QLineEdit.Password)
+        self.smtp_pass.setPlaceholderText("senha do e-mail smtp")
+
+        self.smtp_ssl = QCheckBox("Utilizar conexão criptografada SSL/TLS (Porta 465)")
+        self.smtp_ssl.toggled.connect(self._on_ssl_toggled)
+
+        self.smtp_to = QLineEdit()
+        self.smtp_to.setPlaceholderText("ex: noc@webstorage.com.br")
+
+        form.addRow(self._kv_label("Servidor SMTP:"), self.smtp_host)
+        form.addRow(self._kv_label("Porta SMTP:"), self.smtp_port)
+        form.addRow(self._kv_label("Usuário/Email:"), self.smtp_user)
+        form.addRow(self._kv_label("Senha SMTP:"), self.smtp_pass)
+        form.addRow("", self.smtp_ssl)
+        form.addRow(self._kv_label("E-mail Destino:"), self.smtp_to)
+        
+        cl.addLayout(form)
+
+        # Actions
+        btn_lay = QHBoxLayout()
+        save_btn = QPushButton("💾  Salvar SMTP")
+        save_btn.setObjectName("BtnPrimary")
+        save_btn.clicked.connect(self.save_smtp)
+        
+        test_btn = QPushButton("⚡  Testar Conexão")
+        test_btn.setObjectName("Btn")
+        test_btn.clicked.connect(self.test_smtp)
+
+        self.smtp_status_lbl = QLabel("")
+        self.smtp_status_lbl.setStyleSheet("font-size: 12px; color: #9aa6c2;")
+
+        btn_lay.addWidget(save_btn)
+        btn_lay.addWidget(test_btn)
+        btn_lay.addWidget(self.smtp_status_lbl)
+        btn_lay.addStretch()
+        cl.addLayout(btn_lay)
+
+        # Load values
+        smtp_data = self.db.get_smtp_config()
+        if smtp_data:
+            shost, sport, suser, spass, sssl, sto = smtp_data
+            self.smtp_host.setText(shost)
+            self.smtp_port.setValue(sport or 587)
+            self.smtp_user.setText(suser)
+            self.smtp_pass.setText(spass)
+            self.smtp_ssl.setChecked(bool(sssl))
+            self.smtp_to.setText(sto)
+
+        lay.addWidget(card)
+        lay.addStretch()
+        return w
+
+    def _on_ssl_toggled(self, checked):
+        if checked:
+            self.smtp_port.setValue(465)
+        else:
+            self.smtp_port.setValue(587)
+
+    def save_smtp(self):
+        host = self.smtp_host.text().strip()
+        port = self.smtp_port.value()
+        user = self.smtp_user.text().strip()
+        password = self.smtp_pass.text()
+        ssl = self.smtp_ssl.isChecked()
+        to_email = self.smtp_to.text().strip()
+
+        if not host or not to_email:
+            QMessageBox.warning(self, "Aviso", "Servidor SMTP e E-mail Destino são obrigatórios.")
+            return
+
+        self.db.save_smtp_config(host, port, user, password, ssl, to_email)
+        self.db.add_log("INFO", "SMTP", "Configurações de alerta SMTP atualizadas.")
+        QMessageBox.information(self, "Sucesso", "Configurações de alerta SMTP salvas com sucesso.")
+
+    def test_smtp(self):
+        host = self.smtp_host.text().strip()
+        port = self.smtp_port.value()
+        user = self.smtp_user.text().strip()
+        password = self.smtp_pass.text()
+        ssl = self.smtp_ssl.isChecked()
+        to_email = self.smtp_to.text().strip()
+
+        if not host or not to_email:
+            QMessageBox.warning(self, "Aviso", "Preencha o servidor e o e-mail de destino para testar.")
+            return
+
+        self.smtp_status_lbl.setText("Enviando e-mail de teste...")
+        self.smtp_status_lbl.setStyleSheet("color: #fbbf24;")
+        
+        self.smtp_worker = SmtpTestWorker(host, port, user, password, ssl, to_email)
+        self.smtp_worker.finished.connect(self._on_smtp_test_finished)
+        self.smtp_worker.start()
+
+    def _on_smtp_test_finished(self, success, msg):
+        if success:
+            self.smtp_status_lbl.setText("✓ Teste enviado com sucesso!")
+            self.smtp_status_lbl.setStyleSheet("color: #4ade80;")
+            QMessageBox.information(self, "Sucesso", msg)
+        else:
+            self.smtp_status_lbl.setText("✗ Falha no envio de teste.")
+            self.smtp_status_lbl.setStyleSheet("color: #ff5c7a;")
+            QMessageBox.critical(self, "Falha de Conectividade", f"Erro ao enviar e-mail:\n{msg}")
+
+    # ─── HELP TAB ───
+    def _build_help_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(10)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background-color: transparent;")
+
+        content = QFrame()
+        content.setObjectName("Card")
+        content.setStyleSheet("background-color: rgba(20, 27, 48, 0.55); border: 1px solid rgba(110, 140, 220, 0.14); border-radius: 12px;")
+        cl = QVBoxLayout(content)
+        cl.setContentsMargins(20, 20, 20, 20)
+        cl.setSpacing(12)
+
+        title = QLabel("INSTRUÇÕES BÁSICAS DE USO")
+        title.setStyleSheet("font-size: 12px; color: #3da9fc; font-weight: bold; letter-spacing: 0.1em; margin-bottom: 8px;")
+        cl.addWidget(title)
+
+        help_text = QLabel(
+            "<h3 style='color:#e7ecf7;'>1. Mapa de Peering BGP</h3>"
+            "<p style='color:#9aa6c2; line-height: 1.4; font-size:12.5px;'>"
+            "O <b>Dashboard</b> apresenta uma representação gráfica da topologia de rotas BGP. "
+            "As sessões cadastradas no <b>ASN Manager</b> são renderizadas em tempo real em formato circular ao redor do seu AS próprio (marcado como tipo 'Próprio' / 'self'). "
+            "A cor e as informações das linhas tracejadas refletem o tipo de peer (Trânsito BGP, Peer direto ou conexões de IX/PTT)."
+            "</p>"
+            "<h3 style='color:#e7ecf7;'>2. Gerenciador de ASNs e Hosts</h3>"
+            "<p style='color:#9aa6c2; line-height: 1.4; font-size:12.5px;'>"
+            "Utilize a barra superior para adicionar ativos globalmente ou acesse os painéis específicos:<br>"
+            "&nbsp;&nbsp;• <b>ASN Manager</b>: Cadastro e controle de ASNs parceiros, trânsitos e destinos, permitindo múltiplos prefixos em bloco (formato CIDR).<br>"
+            "&nbsp;&nbsp;• <b>Host Manager</b>: Inventário de roteadores, switches, firewalls e servidores locais e de borda, incluindo portas e credenciais para conexões automáticas."
+            "</p>"
+            "<h3 style='color:#e7ecf7;'>3. Diagnóstico e Acesso CLI</h3>"
+            "<p style='color:#9aa6c2; line-height: 1.4; font-size:12.5px;'>"
+            "No painel de <b>Network Tools</b> é possível disparar ferramentas rápidas como <i>Ping</i> e <i>Traceroute</i> "
+            "com visualização analítica inteligente de saltos e trânsitos em IX.br.<br>"
+            "Os terminais <i>SSH</i> e <i>Telnet</i> permitem acesso direto via CLI em tempo real aos hosts cadastrados, bastando selecionar o host e clicar em Conectar."
+            "</p>"
+            "<h3 style='color:#e7ecf7;'>4. Alertas e Logs do Sistema</h3>"
+            "<p style='color:#9aa6c2; line-height: 1.4; font-size:12.5px;'>"
+            "Alertas ativos geram notificações visuais na barra superior e no dashboard (com detalhes dos incidentes críticos como prepend e flapping). "
+            "Eventos de sistema são registrados no <b>Console de Logs</b>, de onde podem ser monitorados e filtrados por nível de severidade (INFO, WARN, ERROR)."
+            "</p>"
+        )
+        help_text.setWordWrap(True)
+        help_text.setTextFormat(Qt.RichText)
+        cl.addWidget(help_text)
+        cl.addStretch()
+
+        scroll.setWidget(content)
+        lay.addWidget(scroll)
+        return w
+
+    # ─── ABOUT TAB ───
+    def _build_about_tab(self):
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(16)
+
         about = QFrame()
         about.setObjectName("Card")
         al = QVBoxLayout(about)
         al.setContentsMargins(20, 18, 20, 18)
         al.setSpacing(10)
 
-        title = QLabel("SOBRE")
+        title = QLabel("INFORMAÇÕES DO SISTEMA")
         title.setStyleSheet("font-size: 11px; color: #6b7693; font-weight: 700; letter-spacing: 0.14em;")
         al.addWidget(title)
 
@@ -114,10 +378,9 @@ class SettingsScreen(QWidget):
         meta.addWidget(QLabel(sys.platform), 3, 1)
         al.addLayout(meta)
 
-        layout.addWidget(about)
-        layout.addStretch()
-
-        self.update_db_size()
+        lay.addWidget(about)
+        lay.addStretch()
+        return w
 
     def _kv_label(self, text):
         l = QLabel(text)

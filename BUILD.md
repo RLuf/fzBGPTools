@@ -30,26 +30,36 @@ REM → dist\fzBGPTools-0.2.0-setup.exe
 
 O script já converte `icon.png` em `icon.ico` automaticamente via Pillow.
 
-## 🤖 Release automatizada (recomendado)
+## 🤖 Compilação e Release no GitHub (Recomendado)
 
-```bash
-# 1. Bump
-python scripts/bump_version.py 0.3.0
+O repositório possui uma pipeline CI/CD configurada no GitHub Actions em `.github/workflows/release.yml` que compila e empacota a aplicação automaticamente. Existem duas maneiras de usar este fluxo:
 
-# 2. Edite CHANGELOG.md adicionando as mudanças desta release
+### Método 1: Criação de Release Oficial (Via Git Tag)
+Este é o método recomendado para gerar uma nova versão pública com os instaladores executáveis finais.
+1. Atualize a versão no código rodando:
+   ```bash
+   python scripts/bump_version.py 0.3.0
+   ```
+2. Documente as alterações no [CHANGELOG.md](CHANGELOG.md) sob a seção da nova versão.
+3. Crie um commit e envie a tag correspondente:
+   ```bash
+   git add -A
+   git commit -m "release: v0.3.0"
+   make tag  # Executa: git tag v0.3.0 && git push origin v0.3.0
+   ```
+4. A pipeline do GitHub Actions será disparada automaticamente:
+   - Compila o binário standalone e gera o `.deb` em um runner Ubuntu Linux.
+   - Compila o binário e gera o `.exe` do instalador em um runner Windows Server.
+   - Cria um **GitHub Release** automático contendo ambos os instaladores e extrai as notas de atualização direto do `CHANGELOG.md`.
 
-# 3. Commit + tag (Makefile faz `git tag` + `push origin v$VERSION`)
-git add -A && git commit -m "release: v0.3.0"
-make tag
-```
-
-A pipeline em `.github/workflows/release.yml`:
-1. Roda em paralelo nos runners `ubuntu-22.04` e `windows-2022`
-2. Builda o binário PyInstaller em cada plataforma
-3. Empacota `.deb` (Linux) e `.exe` (Windows)
-4. Cria um GitHub Release com os assets + notas extraídas do CHANGELOG
-
-Tempo total típico: **~6 minutos**.
+### Método 2: Execução Manual (Sem Criar Release)
+Se você deseja apenas testar a compilação remota a partir de uma branch qualquer, sem publicar uma release formal:
+1. Vá até a página do repositório no GitHub.
+2. Acesse a aba **Actions** e selecione o workflow **Release** no menu à esquerda.
+3. Clique no botão dropdown **Run workflow** do lado direito.
+4. Escolha a branch desejada e digite a versão temporária (ex: `0.2.0`).
+5. Clique em **Run workflow**.
+6. A execução irá compilar ambos os pacotes (Linux e Windows) em paralelo. Quando concluído, os instaladores estarão disponíveis para download direto como arquivos zipados na seção **Artifacts** na base da página da execução do Action (com os nomes `fzbgptools-deb` e `fzbgptools-exe`).
 
 ## 🍎 macOS → `.app` (opcional)
 

@@ -4,8 +4,10 @@ Adiciona Discovery e fia ações entre telas (Host Manager → Network Tools etc
 """
 
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFrame,
-                              QLabel, QPushButton, QStackedWidget, QButtonGroup)
-from PyQt5.QtCore import Qt
+                              QLabel, QPushButton, QStackedWidget, QButtonGroup, QLineEdit,
+                              QScrollArea, QDialog)
+from PyQt5.QtCore import Qt, QTimer, QUrl, QPoint
+from PyQt5.QtGui import QFont, QColor, QDesktopServices
 
 from src.ui.dashboard import DashboardScreen
 from src.ui.asn_manager import AsnManagerScreen
@@ -15,14 +17,204 @@ from src.ui.network_tools import NetworkToolsScreen
 from src.ui.logs_console import LogsConsoleScreen
 from src.ui.settings import SettingsScreen
 from src.version import __version__, __app_name__
+from src.engine.updater import UpdateChecker
+
+
+class AlertsDropdown(QDialog):
+    def __init__(self, db, parent=None):
+        super().__init__(parent, Qt.Popup | Qt.FramelessWindowHint)
+        self.db = db
+        self.parent_window = parent
+        self.setFixedWidth(380)
+        self.setFixedHeight(360)
+        self.setObjectName("AlertsDropdownDialog")
+        
+        self.setStyleSheet("""
+            QDialog#AlertsDropdownDialog {
+                background-color: #0e1424;
+                border: 1px solid rgba(120, 160, 240, 0.28);
+                border-radius: 12px;
+            }
+        """)
+        self._init_ui()
+
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Header
+        head = QFrame()
+        head.setStyleSheet("background-color: transparent; border-bottom: 1px solid rgba(110, 140, 220, 0.14);")
+        hl = QHBoxLayout(head)
+        hl.setContentsMargins(14, 12, 14, 12)
+        
+        title = QLabel("ALERTAS BGP")
+        title.setStyleSheet("font-size: 11px; font-weight: bold; color: #e7ecf7; letter-spacing: 0.04em;")
+        hl.addWidget(title)
+        
+        alerts = self.db.get_alerts()
+        crit_count = sum(1 for a in alerts if a[0] == "critical")
+        
+        hl.addStretch()
+        
+        crit_badge = QLabel(f"{crit_count} CRÍTICO{'S' if crit_count != 1 else ''}")
+        crit_badge.setStyleSheet(
+            "background-color: rgba(255, 92, 122, 0.14); color: #ff5c7a; "
+            "border: 1px solid rgba(255, 92, 122, 0.32); border-radius: 6px; "
+            "padding: 2px 6px; font-size: 10px; font-weight: bold;"
+        )
+        hl.addWidget(crit_badge)
+        layout.addWidget(head)
+
+        # Scroll area for alerts list
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("background-color: transparent;")
+        
+        content = QWidget()
+        content.setStyleSheet("background-color: transparent;")
+        cl = QVBoxLayout(content)
+        cl.setContentsMargins(10, 8, 10, 8)
+        cl.setSpacing(8)
+
+        if not alerts:
+            empty = QLabel("Sem alertas ativos.")
+            empty.setAlignment(Qt.AlignCenter)
+            empty.setStyleSheet("color: #6b7693; font-size: 12px; padding: 20px;")
+            cl.addWidget(empty)
+        else:
+            for sev, atitle, desc, meta, timestamp in alerts:
+                item = QFrame()
+                if sev == "critical":
+                    border_color = "rgba(255, 92, 122, 0.15)"
+                    bg_color = "rgba(255, 92, 122, 0.04)"
+                    icon_color = "#ff5c7a"
+                else:
+                    border_color = "rgba(251, 191, 36, 0.15)"
+                    bg_color = "rgba(251, 191, 36, 0.04)"
+                    icon_color = "#fbbf24"
+                    
+                item.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {bg_color};
+                        border: 1px solid {border_color};
+                        border-radius: 8px;
+                    }}
+                """)
+                il = QHBoxLayout(item)
+                il.setContentsMargins(10, 10, 10, 10)
+                il.setSpacing(10)
+
+                ico = QLabel("⚠️" if sev == "critical" else "⚡")
+                ico.setFixedSize(22, 22)
+                ico.setAlignment(Qt.AlignCenter)
+                ico.setStyleSheet(f"background-color: rgba(255,255,255,0.03); border-radius: 4px; font-size: 12px; color: {icon_color};")
+                il.addWidget(ico)
+
+                body = QFrame()
+                body.setStyleSheet("border: none; background: transparent;")
+                bl = QVBoxLayout(body)
+                bl.setContentsMargins(0, 0, 0, 0)
+                bl.setSpacing(2)
+
+                t_lbl = QLabel(atitle)
+                t_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #e7ecf7;")
+                
+                d_lbl = QLabel(desc)
+                d_lbl.setWordWrap(True)
+                d_lbl.setStyleSheet("font-size: 11px; color: #9aa6c2;")
+                
+                time_lbl = QLabel(str(timestamp)[:16])
+                time_lbl.setStyleSheet("font-size: 10px; color: #6b7693; font-family: monospace;")
+                
+                bl.addWidget(t_lbl)
+                bl.addWidget(d_lbl)
+                bl.addWidget(time_lbl)
+                il.addWidget(body, 1)
+                
+                cl.addWidget(item)
+        
+        cl.addStretch()
+        scroll.setWidget(content)
+        layout.addWidget(scroll, 1)
+
+        # Footer
+        foot = QFrame()
+        foot.setStyleSheet("background-color: rgba(11, 15, 25, 0.4); border-top: 1px solid rgba(110, 140, 220, 0.14);")
+        ftl = QHBoxLayout(foot)
+        ftl.setContentsMargins(12, 10, 12, 10)
+        ftl.setSpacing(8)
+
+        clear_btn = QPushButton("Limpar Alertas")
+        clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                color: #ff5c7a;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                text-decoration: underline;
+            }
+        """)
+        clear_btn.clicked.connect(self.clear_alerts)
+        
+        view_btn = QPushButton("Ver no Dashboard")
+        view_btn.setFixedHeight(28)
+        view_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3da9fc;
+                color: #0b0f19;
+                font-weight: bold;
+                font-size: 11px;
+                border: none;
+                border-radius: 6px;
+                padding: 4px 10px;
+            }
+            QPushButton:hover {
+                background-color: #21d4fd;
+            }
+        """)
+        view_btn.clicked.connect(self.go_to_dashboard)
+
+        ftl.addWidget(clear_btn)
+        ftl.addStretch()
+        ftl.addWidget(view_btn)
+        layout.addWidget(foot)
+
+    def clear_alerts(self):
+        with self.db.get_conn() as conn:
+            conn.cursor().execute("DELETE FROM alerts")
+            conn.commit()
+        self.db.add_log("INFO", "Alerts", "Todos os alertas marcados como lidos e removidos pelo usuário.")
+        if hasattr(self.parent_window, "screen_dashboard"):
+            self.parent_window.screen_dashboard.refresh_data()
+        self.accept()
+
+    def go_to_dashboard(self):
+        if hasattr(self.parent_window, "_switch"):
+            self.parent_window._switch("dashboard")
+        self.accept()
 
 
 class MainWindow(QMainWindow):
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self.db = db
+        self.updater = UpdateChecker(self)
+        self.updater.state_changed.connect(self._on_update_state)
+        
         self._init_ui()
         self._wire_cross_screen_actions()
+        self.update_alerts_badge()
+
+        # Update alerts count badge periodically
+        self.badge_timer = QTimer(self)
+        self.badge_timer.timeout.connect(self.update_alerts_badge)
+        self.badge_timer.start(5000)
 
     def _init_ui(self):
         self.setWindowTitle(f"{__app_name__} v{__version__} — Network Peering Mapper")
@@ -49,9 +241,13 @@ class MainWindow(QMainWindow):
         bl.setSpacing(2)
         bt = QLabel("fzBGPTools")
         bt.setStyleSheet("font-size: 18px; font-weight: 800; color: #e7ecf7; letter-spacing: 0.04em;")
-        bs = QLabel(f"PEERING MAPPER · v{__version__}")
-        bs.setStyleSheet("font-size: 9.5px; color: #6b7693; letter-spacing: 0.18em; font-weight: 600;")
-        bl.addWidget(bt); bl.addWidget(bs)
+        bs = QLabel("PEERING MAPPER")
+        bs.setStyleSheet("font-size: 9.5px; color: #6b7693; letter-spacing: 0.18em; font-weight: 600; text-transform: uppercase;")
+        bc = QLabel("© Webstorage Tecnologia")
+        bc.setStyleSheet("font-size: 9.5px; color: #6b7693; margin-top: 4px; opacity: 0.7;")
+        bl.addWidget(bt)
+        bl.addWidget(bs)
+        bl.addWidget(bc)
         sl.addWidget(brand)
 
         sl.addWidget(self._nav_label("OPERAÇÃO"))
@@ -91,14 +287,65 @@ class MainWindow(QMainWindow):
         dot.setStyleSheet("background-color: #4ade80; border-radius: 4px;")
         st = QLabel("Monitorando")
         st.setStyleSheet("color: #4ade80; font-size: 11px; font-weight: 700;")
-        sp_l.addWidget(dot); sp_l.addWidget(st); sp_l.addStretch()
+        sp_l.addWidget(dot)
+        sp_l.addWidget(st)
+        sp_l.addStretch()
+        
+        small_as = QLabel("AS263870")
+        small_as.setStyleSheet("color: #6b7693; font-size: 10.5px; font-weight: 500;")
+        sp_l.addWidget(small_as)
         fl.addWidget(status_pill)
 
-        version_lbl = QLabel(f"v{__version__} · build local")
-        version_lbl.setStyleSheet("color: #6b7693; font-size: 10px; padding: 4px 6px;")
-        fl.addWidget(version_lbl)
-        sl.addWidget(footer)
+        # Upgrade button
+        self.upgrade_btn = QPushButton("Verificar atualização")
+        self.upgrade_btn.setObjectName("UpgradeBtn")
+        self.upgrade_btn.clicked.connect(self.check_update)
+        fl.addWidget(self.upgrade_btn)
 
+        # User Card
+        user_card = QFrame()
+        user_card.setObjectName("UserCard")
+        u_layout = QHBoxLayout(user_card)
+        u_layout.setContentsMargins(8, 8, 8, 8)
+        u_layout.setSpacing(10)
+        
+        avatar = QLabel("NA")
+        avatar.setObjectName("UserAvatar")
+        avatar.setFixedSize(32, 32)
+        avatar.setAlignment(Qt.AlignCenter)
+        
+        info = QFrame()
+        info.setStyleSheet("border: none; background: transparent;")
+        info_layout = QVBoxLayout(info)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(2)
+        name_lbl = QLabel("netadmin")
+        name_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #e7ecf7;")
+        role_lbl = QLabel("Webstorage NOC")
+        role_lbl.setStyleSheet("font-size: 11px; color: #6b7693;")
+        info_layout.addWidget(name_lbl)
+        info_layout.addWidget(role_lbl)
+        
+        u_layout.addWidget(avatar)
+        u_layout.addWidget(info)
+        u_layout.addStretch()
+        fl.addWidget(user_card)
+
+        # Author and License
+        author_lbl = QLabel('Eng. <a href="https://about.rogerluft.com.br" style="color: #9aa6c2; text-decoration: none;">Roger Luft</a>')
+        author_lbl.setOpenExternalLinks(True)
+        author_lbl.setToolTip("roger@webstorage.com.br")
+        author_lbl.setAlignment(Qt.AlignCenter)
+        author_lbl.setStyleSheet("font-size: 10px; color: #6b7693; margin-top: 2px;")
+        fl.addWidget(author_lbl)
+
+        license_lbl = QLabel('<a href="https://creativecommons.org/licenses/by/4.0/" style="color: #6b7693; text-decoration: none; font-weight: bold;">CC BY 4.0</a>')
+        license_lbl.setOpenExternalLinks(True)
+        license_lbl.setAlignment(Qt.AlignCenter)
+        license_lbl.setStyleSheet("font-size: 10px; color: #6b7693;")
+        fl.addWidget(license_lbl)
+
+        sl.addWidget(footer)
         main.addWidget(sidebar)
 
         # ─── Right pane ───
@@ -113,10 +360,77 @@ class MainWindow(QMainWindow):
                              "border-bottom: 1px solid rgba(110, 140, 220, 0.14);")
         tl = QHBoxLayout(topbar)
         tl.setContentsMargins(28, 0, 28, 0)
+        tl.setSpacing(12)
+
         self.crumb = QLabel("Operação / <b>Dashboard</b>")
         self.crumb.setObjectName("Crumb")
         tl.addWidget(self.crumb)
         tl.addStretch()
+
+        # Global Add Dropdown Menu
+        self.add_asset_btn = QPushButton("＋ Adicionar")
+        self.add_asset_btn.setObjectName("BtnPrimary")
+        self.add_asset_btn.setFixedHeight(36)
+        self.add_asset_btn.setMinimumWidth(110)
+        
+        from PyQt5.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #0e1424;
+                color: #e7ecf7;
+                border: 1px solid rgba(120, 160, 240, 0.28);
+                border-radius: 8px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 20px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #3da9fc;
+                color: #0b0f19;
+                font-weight: bold;
+            }
+        """)
+        action_asn = menu.addAction("Novo ASN")
+        action_host = menu.addAction("Novo Host")
+        action_asn.triggered.connect(self._add_asn_global)
+        action_host.triggered.connect(self._add_host_global)
+        self.add_asset_btn.setMenu(menu)
+        tl.addWidget(self.add_asset_btn)
+
+        # Global Search
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Buscar ASN, IP, hostname...")
+        self.search_input.setFixedWidth(280)
+        self.search_input.setObjectName("SearchInput")
+        self.search_input.textChanged.connect(self.on_global_search)
+        tl.addWidget(self.search_input)
+
+        # Keyboard shortcut label ⌘K
+        self.kbd_lbl = QLabel("⌘K")
+        self.kbd_lbl.setStyleSheet("font-size: 10px; padding: 2px 6px; border-radius: 4px; background-color: rgba(255,255,255,0.06); color: #6b7693; border: 1px solid rgba(110, 140, 220, 0.14);")
+        tl.addWidget(self.kbd_lbl)
+
+        # Alerts Button with Badge Overlay
+        self.alerts_btn = QPushButton("🔔")
+        self.alerts_btn.setObjectName("AlertsBtn")
+        self.alerts_btn.setFixedSize(36, 36)
+        self.alerts_btn.clicked.connect(self.show_alerts_dropdown)
+        tl.addWidget(self.alerts_btn)
+
+        # Alerts Badge
+        self.alerts_badge = QLabel("0", self.alerts_btn)
+        self.alerts_badge.setStyleSheet(
+            "background-color: #ff5c7a; color: #0b0f19; border-radius: 7px; "
+            "font-size: 9px; font-weight: bold; border: 1.5px solid #0e1424;"
+        )
+        self.alerts_badge.setFixedSize(15, 15)
+        self.alerts_badge.setAlignment(Qt.AlignCenter)
+        self.alerts_badge.move(20, -1)
+        self.alerts_badge.hide()
+
         refresh = QPushButton("↻")
         refresh.setFixedSize(36, 36)
         refresh.setObjectName("Btn")
@@ -209,6 +523,10 @@ class MainWindow(QMainWindow):
         self.crumb.setText(crumb)
         self.stack.setCurrentIndex(idx)
         btn.setChecked(True)
+        
+        # Reset search box text when switching screens
+        self.search_input.clear()
+        
         try:
             refresh()
         except Exception:
@@ -230,3 +548,104 @@ class MainWindow(QMainWindow):
                 refreshers[idx]()
             except Exception:
                 pass
+        self.update_alerts_badge()
+
+    # ─── Mockup Updates fiação ───
+    def check_update(self):
+        self.updater.check()
+
+    def _on_update_state(self, state):
+        # idle | checking | uptodate | available | error
+        if state == "checking":
+            self.upgrade_btn.setText("Verificando...")
+            self.upgrade_btn.setEnabled(False)
+            self.upgrade_btn.setStyleSheet("background-color: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.28); color: #fbbf24; font-weight: 600; padding: 8px 12px; border-radius: 8px;")
+        elif state == "available":
+            self.upgrade_btn.setText("Atualização disponível")
+            self.upgrade_btn.setEnabled(True)
+            self.upgrade_btn.setStyleSheet("background-color: rgba(161, 140, 255, 0.10); border: 1px solid rgba(161, 140, 255, 0.32); color: #a18cff; font-weight: 600; padding: 8px 12px; border-radius: 8px;")
+            self.upgrade_btn.clicked.disconnect()
+            self.upgrade_btn.clicked.connect(self._open_release_url)
+        elif state == "uptodate":
+            self.upgrade_btn.setText("✓ Atualizado")
+            self.upgrade_btn.setEnabled(False)
+            self.upgrade_btn.setStyleSheet("background-color: rgba(74, 222, 128, 0.08); border: 1px solid rgba(74, 222, 128, 0.28); color: #4ade80; font-weight: 600; padding: 8px 12px; border-radius: 8px;")
+            QTimer.singleShot(3000, self._reset_upgrade_btn)
+        elif state == "error" or state == "idle":
+            self.upgrade_btn.setText("Verificar atualização")
+            self.upgrade_btn.setEnabled(True)
+            self.upgrade_btn.setStyleSheet("")
+            try:
+                self.upgrade_btn.clicked.disconnect()
+            except Exception:
+                pass
+            self.upgrade_btn.clicked.connect(self.check_update)
+
+    def _open_release_url(self):
+        QDesktopServices.openUrl(QUrl("https://fzrepo.rogerluft.com.br/webstorage/fzBGPTools/releases/latest"))
+        self._reset_upgrade_btn()
+
+    def _reset_upgrade_btn(self):
+        self.upgrade_btn.setText("Verificar atualização")
+        self.upgrade_btn.setEnabled(True)
+        self.upgrade_btn.setStyleSheet("")
+        try:
+            self.upgrade_btn.clicked.disconnect()
+        except Exception:
+            pass
+        self.upgrade_btn.clicked.connect(self.check_update)
+
+    def show_alerts_dropdown(self):
+        dropdown = AlertsDropdown(self.db, self)
+        # Position right below the alerts button
+        btn_pos = self.alerts_btn.mapToGlobal(self.alerts_btn.rect().bottomLeft())
+        x = btn_pos.x() + self.alerts_btn.width() - dropdown.width()
+        y = btn_pos.y() + 4
+        dropdown.move(x, y)
+        dropdown.exec_()
+        self.update_alerts_badge()
+
+    def update_alerts_badge(self):
+        try:
+            alerts = self.db.get_alerts()
+            count = len(alerts)
+            if count > 0:
+                self.alerts_badge.setText(str(count))
+                self.alerts_badge.show()
+            else:
+                self.alerts_badge.hide()
+        except Exception:
+            pass
+
+    def on_global_search(self, text):
+        idx = self.stack.currentIndex()
+        screens = [
+            None,                  # Dashboard - no search
+            self.screen_asn,       # ASN Manager
+            self.screen_hosts,     # Host Manager
+            None,                  # Auto Descoberta - no search
+            None,                  # Network Tools - no search
+            None,                  # Console de Logs - no search
+            None                   # Settings - no search
+        ]
+        if idx < len(screens) and screens[idx] is not None:
+            screen = screens[idx]
+            if hasattr(screen, "search") and isinstance(screen.search, QLineEdit):
+                screen.search.setText(text)
+
+    def _add_asn_global(self):
+        self._switch("asn")
+        self.screen_asn.add_asn()
+
+    def _add_host_global(self):
+        self._switch("hosts")
+        self.screen_hosts.add_host()
+
+    def keyPressEvent(self, event):
+        # Ctrl+K focus search
+        if event.modifiers() & Qt.ControlModifier and event.key() == Qt.Key_K:
+            self.search_input.setFocus()
+            self.search_input.selectAll()
+            event.accept()
+        else:
+            super().keyPressEvent(event)

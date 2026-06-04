@@ -26,6 +26,8 @@ class BGPGraphWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.dash_offset = 0
+        self.nodes = list(NODES)
+        self.edges = list(EDGES)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate)
         self.timer.start(50)  # 20 FPS
@@ -33,6 +35,78 @@ class BGPGraphWidget(QWidget):
     def animate(self):
         self.dash_offset = (self.dash_offset - 1) % 20
         self.update()
+
+    def load_db_data(self, db):
+        try:
+            asns = db.get_asns()
+            if not asns:
+                return
+                
+            new_nodes = []
+            own_asn = next((a for a in asns if a[2] == "self"), None)
+            if not own_asn and len(asns) > 0:
+                own_asn = asns[0]
+                
+            if own_asn:
+                new_nodes.append({
+                    "id": f"AS{own_asn[0]}",
+                    "org": own_asn[1],
+                    "type": own_asn[2],
+                    "x": 0.50,
+                    "y": 0.50,
+                    "asn": own_asn[0],
+                    "sub": own_asn[3]
+                })
+                
+            other_asns = [a for a in asns if a != own_asn]
+            n_others = len(other_asns)
+            
+            for i, a in enumerate(other_asns):
+                angle = (2 * math.pi * i) / n_others if n_others > 0 else 0
+                radius_x = 0.30
+                radius_y = 0.35
+                nx = 0.50 + radius_x * math.cos(angle)
+                ny = 0.50 + radius_y * math.sin(angle)
+                
+                new_nodes.append({
+                    "id": f"AS{a[0]}",
+                    "org": a[1],
+                    "type": a[2],
+                    "x": nx,
+                    "y": ny,
+                    "asn": a[0],
+                    "sub": a[3]
+                })
+                
+            self.nodes = new_nodes
+            
+            new_edges = []
+            if own_asn:
+                own_id = f"AS{own_asn[0]}"
+                for a in other_asns:
+                    other_id = f"AS{a[0]}"
+                    kind = "peering"
+                    if a[2] == "transit":
+                        kind = "transit"
+                    elif a[2] == "ix":
+                        kind = "public"
+                        
+                    prefixes_str = a[4] or ""
+                    parts = [p.strip() for p in prefixes_str.replace("\n", ",").replace(";", ",").split(",") if p.strip()]
+                    n_prefixes = len(parts)
+                    bps = f"{n_prefixes} prefixo{'s' if n_prefixes != 1 else ''}"
+                    
+                    new_edges.append({
+                        "from": own_id,
+                        "to": other_id,
+                        "label": a[3],
+                        "kind": kind,
+                        "bps": bps
+                    })
+            self.edges = new_edges
+            self.update()
+        except Exception:
+            pass
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -54,9 +128,11 @@ class BGPGraphWidget(QWidget):
             return QPointF(node["x"] * w, node["y"] * h)
 
         # Draw Edges (Connection Lines)
-        for edge in EDGES:
-            node_from = next(n for n in NODES if n["id"] == edge["from"])
-            node_to = next(n for n in NODES if n["id"] == edge["to"])
+        for edge in self.edges:
+            node_from = next((n for n in self.nodes if n["id"] == edge["from"]), None)
+            node_to = next((n for n in self.nodes if n["id"] == edge["to"]), None)
+            if not node_from or not node_to:
+                continue
             
             p1 = get_pos(node_from)
             p2 = get_pos(node_to)
@@ -106,7 +182,7 @@ class BGPGraphWidget(QWidget):
                 painter.drawText(int(mx - 30), int(my - 6), f"{edge['bps']}")
 
         # Draw Nodes
-        for node in NODES:
+        for node in self.nodes:
             p = get_pos(node)
             
             # Node glow & border gradients
@@ -144,6 +220,7 @@ class BGPGraphWidget(QWidget):
             asn_text = f"AS{node['asn']}"
             painter.drawText(int(p.x() - 30), int(p.y() - 2), 60, 16, Qt.AlignCenter, asn_text)
             
+            # Sub type
             painter.setPen(QPen(QColor("rgba(255,255,255,0.7)"), 1))
             painter.setFont(QFont("Inter", 8))
             painter.drawText(int(p.x() - 30), int(p.y() + 12), 60, 12, Qt.AlignCenter, node["sub"])
@@ -205,16 +282,16 @@ class DashboardScreen(QWidget):
         stats_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout.setSpacing(12)
         
-        self.stat_cards = []
-        stats_data = [
-            ("Sessões eBGP", "7 / 7", "↑ 100% Established", "up"),
-            ("Prefixos recebidos", "964.3 K", "+1.2K nas últimas 24h", "up"),
-            ("Hosts monitorados", "152 / 156", "152 online · 4 offline", "up"),
-            ("Tráfego agregado", "3.81 Gbps", "↑ 8.4% vs ontem", "up"),
-            ("Alertas ativos", "3", "2 críticos · 1 warn", "dn")
+        self.stats_labels = {}
+        stats_init = [
+            ("ebgp", "Sessões eBGP", "0 / 0", "Established", "up"),
+            ("prefixes", "Prefixos recebidos", "0", "Total prefixos", "up"),
+            ("hosts", "Hosts monitorados", "0 / 0", "Online / Total", "up"),
+            ("traffic", "Tráfego agregado", "3.81 Gbps", "↑ 8.4% vs ontem", "up"),
+            ("alerts", "Alertas ativos", "0", "Críticos / Warn", "dn")
         ]
         
-        for title, val, delta, status in stats_data:
+        for key, title, val, delta, status in stats_init:
             card = QFrame()
             card.setObjectName("StatCard")
             card_layout = QVBoxLayout(card)
@@ -233,6 +310,8 @@ class DashboardScreen(QWidget):
             card_layout.addWidget(v_lbl)
             card_layout.addWidget(d_lbl)
             stats_layout.addWidget(card)
+            
+            self.stats_labels[key] = (v_lbl, d_lbl)
             
         layout.addWidget(stats_frame)
         
@@ -336,24 +415,80 @@ class DashboardScreen(QWidget):
         self.refresh_data()
 
     def refresh_data(self):
-        # Populate alerts
-        alerts = self.db.get_alerts()
-        self.alerts_table.setRowCount(0)
-        self.alert_badge.setText(f"{len(alerts)} ativos")
-        for sev, title, desc, meta, timestamp in alerts:
-            row = self.alerts_table.rowCount()
-            self.alerts_table.insertRow(row)
+        try:
+            # 1. Update ASNs / eBGP sessions from DB
+            asns = self.db.get_asns()
+            total_asns = len(asns)
+            active_asns = sum(1 for a in asns if a[6] == "Ativo")
             
-            # Level item
-            level_item = QTableWidgetItem(sev.upper())
-            if sev == "critical":
-                level_item.setForeground(QColor("#ff5c7a"))
-            else:
-                level_item.setForeground(QColor("#fbbf24"))
+            # Calculate total prefixes received
+            total_prefixes = 0
+            for a in asns:
+                prefixes_str = a[4] or ""
+                if prefixes_str:
+                    parts = [p.strip() for p in prefixes_str.replace("\n", ",").replace(";", ",").split(",") if p.strip()]
+                    total_prefixes += len(parts)
+                    
+            # 2. Update Hosts from DB
+            hosts = self.db.get_hosts()
+            total_hosts = len(hosts)
+            online_hosts = sum(1 for h in hosts if h[8] == "Online")
             
-            self.alerts_table.setItem(row, 0, level_item)
-            self.alerts_table.setItem(row, 1, QTableWidgetItem(title))
-            self.alerts_table.setItem(row, 2, QTableWidgetItem(desc))
+            # 3. Update Alerts from DB
+            alerts = self.db.get_alerts()
+            total_alerts = len(alerts)
+            crit_alerts = sum(1 for a in alerts if a[0] == "critical")
+            warn_alerts = total_alerts - crit_alerts
+            
+            # Update Labels
+            if "ebgp" in self.stats_labels:
+                v, d = self.stats_labels["ebgp"]
+                v.setText(f"{active_asns} / {total_asns}")
+                d.setText(f"↑ {active_asns} Established" if total_asns > 0 else "Sem sessões")
+                
+            if "prefixes" in self.stats_labels:
+                v, d = self.stats_labels["prefixes"]
+                if total_prefixes >= 1000:
+                    v.setText(f"{total_prefixes/1000:.1f} K")
+                else:
+                    v.setText(f"{total_prefixes}")
+                d.setText("Originados e peers")
+                
+            if "hosts" in self.stats_labels:
+                v, d = self.stats_labels["hosts"]
+                v.setText(f"{online_hosts} / {total_hosts}")
+                d.setText(f"{online_hosts} online · {total_hosts - online_hosts} offline")
+                
+            if "alerts" in self.stats_labels:
+                v, d = self.stats_labels["alerts"]
+                v.setText(f"{total_alerts}")
+                d.setText(f"{crit_alerts} críticos · {warn_alerts} warn")
+                d.setProperty("status", "dn" if total_alerts > 0 else "up")
+                d.style().unpolish(d); d.style().polish(d)
+
+            # 4. Populate alerts table
+            self.alerts_table.setRowCount(0)
+            self.alert_badge.setText(f"{total_alerts} ativos")
+            for sev, title, desc, meta, timestamp in alerts:
+                row = self.alerts_table.rowCount()
+                self.alerts_table.insertRow(row)
+                
+                # Level item
+                level_item = QTableWidgetItem(sev.upper())
+                if sev == "critical":
+                    level_item.setForeground(QColor("#ff5c7a"))
+                else:
+                    level_item.setForeground(QColor("#fbbf24"))
+                
+                self.alerts_table.setItem(row, 0, level_item)
+                self.alerts_table.setItem(row, 1, QTableWidgetItem(title))
+                self.alerts_table.setItem(row, 2, QTableWidgetItem(desc))
+
+            # 5. Graph rendering update
+            self.graph_widget.load_db_data(self.db)
+
+        except Exception:
+            pass
 
         # Populate mock last traceroute data matching design
         mock_trace = [

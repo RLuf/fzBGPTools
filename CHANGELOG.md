@@ -5,6 +5,20 @@ Todos os lançamentos notáveis deste projeto são documentados neste arquivo.
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.2.1] — 2026-05-30
+
+### Adicionado
+- **Configurações SMTP de Alerta** — novo painel de configuração SMTP autenticado nas Configurações com suporte a SSL/TLS e botão de teste de conectividade (executado de forma assíncrona por meio de `QThread`).
+- **Botão Global Adicionar** no topbar — botão unificado `＋ Adicionar` que apresenta um menu suspenso (`Novo ASN` / `Novo Host`) para facilitar o cadastro rápido de ativos a partir de qualquer tela.
+- **Ajuda e Instruções** — nova aba de ajuda estruturada com guias rápidos explicativos sobre o funcionamento do mapa BGP, gerenciamento de ativos, ferramentas de diagnóstico e CLI.
+
+### Corrigido
+- **Botão Atualizar no Dashboard** — agora realiza consultas reais ao banco de dados SQLite para atualizar dinamicamente todos os cards de estatísticas (sessões eBGP, prefixos, hosts online/offline, contagem de alertas) e recalcula as posições circulares no mapa BGP.
+- **Responsividade dos Cabeçalhos** — corrigido bug de tamanho e esticamento do `page_header` que escondia os botões de ação e espremia as margens.
+- **Largura das Colunas de Ação** — as tabelas do ASN Manager e Host Manager agora utilizam larguras fixas adequadas (`160px` e `380px` respectivamente) para as colunas de Ações, eliminando o comportamento espremido e a sobreposição dos botões rápidos.
+- **Tematização de Selectboxes (ComboBoxes)** — implementada tematização global escura em todos os menus dropdown/popups de `QComboBox` através do monkeypatching automático de `QListView` na inicialização do aplicativo, garantindo legibilidade completa no Linux.
+- **Tema dos Botões no Linux** — ajustado o estilo CSS para botões principais para forçar o desvio do motor de temas nativos do sistema operacional, resolvendo o bug dos botões brancos fora do tema.
+
 ---
 
 ## [0.2.0] — 2026-05-27
@@ -89,5 +103,6 @@ e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ---
 
+[0.2.1]: https://github.com/rluft/fzBGPTools/releases/tag/v0.2.1
 [0.2.0]: https://github.com/rluft/fzBGPTools/releases/tag/v0.2.0
 [0.1.0]: https://github.com/rluft/fzBGPTools/releases/tag/v0.1.0

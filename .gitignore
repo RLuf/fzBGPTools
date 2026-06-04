@@ -16,6 +16,7 @@ pip-delete-this-directory.txt
 # ─── PyInstaller / Builds ───
 build/work/
 build/__pycache__/
+build/fzbgptools/
 dist/
 *.spec.bak
 
@@ -30,8 +31,22 @@ Thumbs.db
 
 # ─── Logs / DB locais ───
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 *.log
 ~/.config/fzbgptools/
+
+# ─── Secrets / Configs / Chaves ───
+.env
+.env.*
+*.pem
+*.key
+*.pub
+*private*
+credentials*
+*.bak
+*.backup
 
 # ─── Antigravity scratch ───
 /home/rluft/.gemini/

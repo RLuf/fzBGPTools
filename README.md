@@ -76,19 +76,9 @@ make exe      # empacota instalador Windows (NSIS)    → dist\fzBGPTools-X.Y.Z-
 | Windows    | `python3.9+`, `pip`, [NSIS](https://nsis.sourceforge.io) |
 | macOS      | `python3.9+`, `pip` (gera `.app` via PyInstaller)        |
 
-### Release automatizada (recomendado)
-```bash
-# 1. Bump version
-python scripts/bump_version.py 0.3.0
+### Compilação e Release via GitHub Actions (Recomendado)
 
-# 2. Commit + tag
-git add -A && git commit -m "release: v0.3.0"
-make tag
-
-# 3. CI faz o resto: builda .deb + .exe e publica em Releases
-```
-A pipeline em `.github/workflows/release.yml` builda nos runners Ubuntu 22.04 e
-Windows 2022, empacota e cria o GitHub Release com os assets anexados.
+A compilação automatizada de pacotes executáveis está totalmente estruturada em `.github/workflows/release.yml`. Para detalhes completos de como disparar a compilação no GitHub (automática via git tag ou manual sem gerar releases), consulte o guia detalhado em [BUILD.md](BUILD.md#🤖-compilação-e-release-no-github-recomendado).
 
 ---
 

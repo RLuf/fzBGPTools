@@ -1,6 +1,6 @@
 # CHECKPOINT — fzBGPTools
 
-> Salvo em **2026-05-27** — retomada de trabalho após reinício.
+> Salvo em **2026-05-30** — após implementar as correções de layout, temas e fiação dinâmica BGP (versão 0.2.1).
 > Leia este arquivo primeiro ao continuar a sessão.
 
 ---
@@ -18,7 +18,7 @@
 
 ---
 
-## ✅ O que já foi feito (v0.2.0)
+## ✅ O que já foi feito (v0.2.1)
 
 ### 📐 Especificação visual (React prototype)
 - `screens/network-tools.jsx` — Ping com 4 stat cards (perda/min/avg/max), Traceroute com badges hops + IX/PTT
@@ -35,42 +35,19 @@
   `.tool-statusbar`, `.upgrade-btn` + variantes, `.alerts-*`, `.brand-copyright`,
   `.sidebar-author`, `.sidebar-license`
 
-### 🐍 Implementação Python espelhada
-- `src/version.py` — fonte única, com `__author__`, `__author_email__`,
-  `__company__`, `__update_url__`, `__license__`, `__copyright__`
-- `src/main.py` — entry-point com setup de App + tema + ícone
-- `src/database.py` — schema v2 com migração idempotente, tabelas novas:
-  - `range_groups`, `discovered_hosts`, `discovered_services`
-  - Plus `country` em `asns`, `group_name` em `hosts`
-- `src/engine/`
-  - `ping.py` — parser de stats (loss/rtt) com sinais estruturados
-  - `traceroute.py` — com resolução ASN + detecção IX/PTT
-  - `scanner.py` — TCP connect scan 64-thread, fingerprint, banner grab
-  - `ssh_client.py`, `telnet_client.py`, `asn_resolver.py`
-  - `updater.py` — **`UpdateChecker`** que consulta Gitea em fzrepo.rogerluft.com.br
-- `src/ui/`
-  - `theme.py` — stylesheet QSS global expandido (badges, terminal chrome)
-  - `widgets.py` — helpers `badge`, `stat_card`, `page_header`, `terminal_card`, `small_action_btn`
-  - `main_window.py` — sidebar + topbar + stack com Discovery + wiring cruzado
-  - `dashboard.py`, `asn_manager.py`, `host_manager.py`, `discovery.py`,
-    `network_tools.py`, `logs_console.py`, `settings.py`
-
-### 📜 Licenciamento & Branding
-- **LICENSE** → CC BY 4.0 (PT-BR + EN)
-- **Author:** Eng. Roger Luft `<roger@webstorage.com.br>`
-- **Empresa:** Webstorage Tecnologia
-- **Repo de releases:** https://fzrepo.rogerluft.com.br
-
-### 📦 Infra de build & CI
-- `fzbgptools.spec` — PyInstaller cross-platform, paths relativos
-- `pyproject.toml` — license CC-BY-4.0, autor configurado
-- `requirements.txt` — PyQt5, paramiko
-- `Makefile` — `make bin / deb / exe / release / tag`
-- `build/linux/build-deb.sh` + `fzbgptools.desktop`
-- `build/windows/installer.nsi` + `build-win.bat` (gera `.ico` via Pillow)
-- `.github/workflows/release.yml` — CI multi-OS, push tag `v*` → release automática
-- `scripts/bump_version.py`
-- `CHANGELOG.md`, `BUILD.md`, `README.md`, `mudancas.md`, `.gitignore`
+### 🐍 Implementação Python espelhada (v0.2.1)
+- **Tema e Selectboxes**:
+  - Monkeypatch do `QComboBox` em `src/main.py` para forçar `QListView` globalmente, eliminando a legibilidade ruim de dropdowns brancos no Linux.
+  - Ajuste de bordas em `BtnPrimary` no `theme.py` para evitar renderização incorreta por gerenciadores de janelas nativos.
+- **Responsividade e Tamanhos**:
+  - Correção na função `page_header` em `widgets.py` para evitar esmagamento dos botões de ação na barra superior.
+  - Definição de larguras fixas adequadas no ASN Manager (`160px`) e Host Manager (`380px`) para evitar o wrapping de botões.
+- **Gráfico e Estatísticas Dinâmicas**:
+  - O **Dashboard** agora se conecta de verdade ao banco de dados SQLite para atualizar os cards e a topologia circular do BGP em resposta ao clique no botão **Atualizar**.
+- **Ações e Configurações Globais**:
+  - Adicionado o botão global de atalho rápido `＋ Adicionar` no topo de todas as telas.
+  - Implementada a configuração de email de alertas **SMTP com autenticação** (com QThread assíncrona para testar conectividade).
+  - Adicionados os painéis de **Ajuda** e **Sobre** estruturados sob abas na tela de Configurações.
 
 ---
 
@@ -104,28 +81,28 @@ fzBGPTools/                          (projeto)
 │   ├── 📁 engine/
 │   │   ├── asn_resolver.py
 │   │   ├── ping.py
-│   │   ├── scanner.py               ⭐ novo
+│   │   ├── scanner.py
 │   │   ├── ssh_client.py
 │   │   ├── telnet_client.py
 │   │   ├── traceroute.py
-│   │   └── updater.py               ⭐ novo
+│   │   └── updater.py
 │   ├── 📁 resources/
 │   │   ├── icon.png
 │   │   └── icon.svg
 │   ├── 📁 ui/
 │   │   ├── asn_manager.py
 │   │   ├── dashboard.py
-│   │   ├── discovery.py             ⭐ novo
+│   │   ├── discovery.py
 │   │   ├── host_manager.py
 │   │   ├── logs_console.py
 │   │   ├── main_window.py
 │   │   ├── network_tools.py
 │   │   ├── settings.py
 │   │   ├── theme.py
-│   │   └── widgets.py               ⭐ novo
+│   │   └── widgets.py
 │   ├── database.py
 │   ├── main.py
-│   └── version.py                   ⭐ novo
+│   └── version.py                   ⭐ v0.2.1
 ├── app.jsx
 ├── styles.css
 ├── fzBGPTools.html
@@ -136,7 +113,7 @@ fzBGPTools/                          (projeto)
 ├── Makefile
 ├── README.md
 ├── BUILD.md
-├── CHANGELOG.md
+├── CHANGELOG.md                     ⭐ atualizado
 ├── mudancas.md
 ├── LICENSE                          CC BY 4.0
 ├── CHECKPOINT.md                    ◀️ este arquivo
@@ -147,40 +124,25 @@ fzBGPTools/                          (projeto)
 
 ## 🔄 Próximos passos sugeridos (quando retomar)
 
-### Pendências menores que ficaram no ar
-- [ ] Verificar visualmente o botão de alertas (não consegui screenshot na última rodada)
-- [ ] Wireamento do `UpdateChecker` Python na sidebar / settings (`src/ui/main_window.py` ou `src/ui/settings.py`)
-- [ ] Possível: tela dedicada de "Alertas" com filtros + ações em lote
-
-### Roadmap de release
-- [ ] Bumpar versão se houver mais mudanças: `python scripts/bump_version.py 0.3.0`
-- [ ] `git add -A && git commit -m "release: v0.3.0"`
-- [ ] `make tag` → CI builda `.deb` + `.exe` e publica em Releases
+### Validação do Usuário
+- [ ] Aguardar os testes do usuário no ambiente de produção.
+- [ ] Verificar o funcionamento real do envio de e-mails em caso de incidentes (alertas disparados).
 
 ### Possíveis melhorias futuras
-- [ ] Tela de gerenciamento de credenciais SSH (chaves) separada das senhas
-- [ ] Export/import de configurações em JSON além do dump SQLite
-- [ ] Modo dark/light (atualmente só dark; CSS já tem `theme-*` variants)
-- [ ] Whois lookup integrado no ASN Manager
-- [ ] Looking-glass: query BGP em servidores remotos via SSH e parse de saída
-- [ ] Dashboard com gráfico de tráfego ao longo do tempo (sparkline)
+- [ ] Tela de gerenciamento de credenciais SSH (chaves) separada das senhas.
+- [ ] Whois lookup integrado no ASN Manager.
+- [ ] Looking-glass: query BGP em servidores remotos via SSH e parse de saída.
 
 ---
 
 ## 🛠 Como retomar
 
-1. Abra este projeto novamente
-2. Leia `CHECKPOINT.md` (este arquivo) primeiro
-3. Leia `mudancas.md` para histórico de UI
-4. Leia `CHANGELOG.md` para histórico de release
-5. Continue de onde parou — todos os arquivos acima estão sincronizados
+1. Abra este projeto novamente.
+2. Leia `CHECKPOINT.md` (este arquivo) primeiro.
+3. Certifique-se de que a última compilação `.deb` esteja instalada executando o smoke test local.
 
-### Para o dev humano
-- Protótipo abre em `fzBGPTools.html`
-- App Python: `make run` (de dentro do workspace local)
-- Build standalone: `make bin`
-- Pacote Linux: `make deb`
-- Pacote Windows: `build\windows\build-win.bat`
+**Versão atual:** 0.2.1
+**Última edição:** `src/ui/settings.py` (Tabulação e SMTP) e `CHECKPOINT.md`
 
 ### Para o agente IA na próxima sessão
 - O usuário trabalha em pt-BR

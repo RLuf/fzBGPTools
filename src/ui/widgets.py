@@ -47,29 +47,42 @@ def page_header(title, accent, subtitle, actions=None):
     Header padronizado: 'Título <accent>' em destaque + subtitle abaixo.
     actions = lista de QWidgets para o canto direito.
     """
+    from PyQt5.QtWidgets import QSizePolicy
     frame = QFrame()
     lay = QHBoxLayout(frame)
     lay.setContentsMargins(0, 0, 0, 0)
-    lay.setSpacing(12)
+    lay.setSpacing(16)
 
-    left = QFrame()
-    ll = QVBoxLayout(left)
+    # Use a direct layout layout nested under lay
+    ll = QVBoxLayout()
     ll.setContentsMargins(0, 0, 0, 0)
     ll.setSpacing(4)
+
     title_lbl = QLabel(f"<span style='color:#e7ecf7;font-weight:300'>{title}</span> "
                        f"<span style='color:#3da9fc;font-weight:800'>{accent}</span>")
     title_lbl.setStyleSheet("font-size: 22px; letter-spacing: -0.01em;")
+    
     sub_lbl = QLabel(subtitle)
     sub_lbl.setStyleSheet("font-size: 12.5px; color: #9aa6c2;")
     sub_lbl.setWordWrap(True)
+    sub_lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+    
     ll.addWidget(title_lbl)
     ll.addWidget(sub_lbl)
 
-    lay.addWidget(left, 1)
+    lay.addLayout(ll, 1)
 
     if actions:
+        # Wrap in a horizontal layout to prevent squeezing and align nicely
+        al_lay = QHBoxLayout()
+        al_lay.setContentsMargins(0, 0, 0, 0)
+        al_lay.setSpacing(10)
         for a in actions:
-            lay.addWidget(a)
+            a.setMinimumWidth(150)  # Standardized minimum width to prevent squeezing
+            al_lay.addWidget(a)
+        lay.addLayout(al_lay, 0)
+        lay.setAlignment(al_lay, Qt.AlignRight | Qt.AlignVCenter)
+        
     return frame
 
 

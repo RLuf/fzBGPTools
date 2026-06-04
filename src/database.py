@@ -111,6 +111,17 @@ class Database:
                 FOREIGN KEY (host_id) REFERENCES discovered_hosts(id) ON DELETE CASCADE,
                 UNIQUE (host_id, port, proto))""")
 
+            # SMTP Config (email alerts)
+            cur.execute("""CREATE TABLE IF NOT EXISTS smtp_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                host TEXT NOT NULL,
+                port INTEGER NOT NULL,
+                username TEXT,
+                password TEXT,
+                ssl BOOLEAN DEFAULT 0,
+                target_email TEXT NOT NULL
+            )""")
+
             self._migrate(cur)
             self._seed(cur)
             conn.commit()
@@ -125,7 +136,8 @@ class Database:
         if "country" not in cols("asns"):
             cur.execute("ALTER TABLE asns ADD COLUMN country TEXT DEFAULT 'BR'")
         if "date_added" not in cols("asns"):
-            cur.execute("ALTER TABLE asns ADD COLUMN date_added DATETIME DEFAULT CURRENT_TIMESTAMP")
+            cur.execute("ALTER TABLE asns ADD COLUMN date_added DATETIME")
+            cur.execute("UPDATE asns SET date_added = CURRENT_TIMESTAMP WHERE date_added IS NULL")
         if "group_name" not in cols("hosts"):
             cur.execute("ALTER TABLE hosts ADD COLUMN group_name TEXT DEFAULT ''")
 
@@ -357,4 +369,20 @@ class Database:
         with self.get_conn() as conn:
             conn.execute("UPDATE discovered_hosts SET monitor = ? WHERE id = ?",
                          (1 if on else 0, host_id))
+            conn.commit()
+
+    # ───────────────────────── SMTP Config ─────────────────────────
+    def get_smtp_config(self):
+        with self.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT host, port, username, password, ssl, target_email FROM smtp_config LIMIT 1")
+            return cur.fetchone()
+
+    def save_smtp_config(self, host, port, username, password, ssl, target_email):
+        with self.get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM smtp_config")
+            cur.execute("""INSERT INTO smtp_config (host, port, username, password, ssl, target_email)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        (host, port, username, password, 1 if ssl else 0, target_email))
             conn.commit()

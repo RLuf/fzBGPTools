@@ -187,8 +187,10 @@ class HostManagerScreen(QWidget):
             ["Hostname", "IP", "SSH", "Telnet", "Usuário", "Tipo", "Fabricante", "Grupo", "Ações"])
         h = self.table.horizontalHeader()
         h.setSectionResizeMode(QHeaderView.Stretch)
-        for col in (1, 2, 3, 5, 6, 7, 8):
+        for col in (1, 2, 3, 5, 6, 7):
             h.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(8, QHeaderView.Fixed)
+        self.table.setColumnWidth(8, 380)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)

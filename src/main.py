@@ -24,6 +24,14 @@ def resource_path(rel):
 
 
 def main():
+    # Monkeypatch QComboBox to enforce QListView globally
+    from PyQt5.QtWidgets import QComboBox, QListView
+    original_init = QComboBox.__init__
+    def new_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        self.setView(QListView())
+    QComboBox.__init__ = new_init
+
     app = QApplication(sys.argv)
     app.setApplicationName(__app_name__)
     app.setApplicationVersion(__version__)

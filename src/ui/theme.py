@@ -134,7 +134,7 @@ def get_stylesheet():
         background-color: {c['accent']};
         color: {c['bg']};
         font-weight: 700;
-        border: none;
+        border: 1px solid transparent;
         border-radius: 8px;
         padding: 8px 14px;
     }}
@@ -181,13 +181,22 @@ def get_stylesheet():
     }}
     QComboBox::drop-down {{ border: none; width: 22px; }}
     QComboBox::down-arrow {{ image: none; }}
-    QComboBox QAbstractItemView {{
+    QComboBox QAbstractItemView, QComboBox QListView {{
         background-color: {c['bg2']};
         color: {c['text']};
         selection-background-color: {c['accent']};
         selection-color: {c['bg']};
         border: 1px solid {c['border']};
         outline: none;
+    }}
+    QComboBox QAbstractItemView::item, QComboBox QListView::item {{
+        padding: 8px 12px;
+        background-color: {c['bg2']};
+        color: {c['text']};
+    }}
+    QComboBox QAbstractItemView::item:selected, QComboBox QListView::item:selected {{
+        background-color: {c['accent']};
+        color: {c['bg']};
     }}
 
     QSpinBox {{
@@ -354,5 +363,57 @@ def get_stylesheet():
     QProgressBar::chunk {{
         background-color: {c['accent']};
         border-radius: 3px;
+    }}
+
+    /* ════════════════ MOCKUP ELEMENTS ════════════════ */
+    QLineEdit#SearchInput {{
+        background-color: rgba(20, 27, 48, 0.6);
+        border: 1px solid {c['border']};
+        border-radius: 10px;
+        padding: 8px 12px;
+        color: {c['text']};
+        font-size: 13px;
+    }}
+    QLineEdit#SearchInput:focus {{
+        border-color: {c['border_strong']};
+    }}
+    
+    QPushButton#AlertsBtn {{
+        background-color: rgba(20, 27, 48, 0.6);
+        border: 1px solid {c['border']};
+        border-radius: 10px;
+        color: {c['text_dim']};
+        padding: 0px;
+    }}
+    QPushButton#AlertsBtn:hover {{
+        color: {c['text']};
+        border-color: {c['border_strong']};
+    }}
+    
+    QFrame#UserCard {{
+        background-color: transparent;
+        border: 1px solid {c['border']};
+        border-radius: 10px;
+    }}
+    QLabel#UserAvatar {{
+        background-color: {c['accent']};
+        color: {c['bg']};
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 12px;
+    }}
+    
+    QPushButton#UpgradeBtn {{
+        background-color: rgba(61, 169, 252, 0.08);
+        border: 1px solid rgba(61, 169, 252, 0.22);
+        color: {c['accent']};
+        border-radius: 10px;
+        padding: 9px 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }}
+    QPushButton#UpgradeBtn:hover {{
+        background-color: rgba(61, 169, 252, 0.14);
+        border-color: rgba(61, 169, 252, 0.4);
     }}
     """

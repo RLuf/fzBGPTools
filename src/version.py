@@ -1,5 +1,5 @@
 """Single source of truth for the application version."""
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __app_name__ = "fzBGPTools"
 __app_id__ = "fzbgptools"
 __description__ = "Network Peering Mapper — BGP, hosts, diagnósticos e descoberta."

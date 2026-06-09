@@ -181,7 +181,7 @@ class SettingsScreen(QWidget):
         self.smtp_ssl.toggled.connect(self._on_ssl_toggled)
 
         self.smtp_to = QLineEdit()
-        self.smtp_to.setPlaceholderText("ex: noc@webstorage.com.br")
+        self.smtp_to.setPlaceholderText("ex: suporte@webstorage.com.br")
 
         form.addRow(self._kv_label("Servidor SMTP:"), self.smtp_host)
         form.addRow(self._kv_label("Porta SMTP:"), self.smtp_port)

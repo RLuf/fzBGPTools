@@ -26,7 +26,7 @@ const ALERTS = [
 ];
 
 const TRACE = [
-  { hop: 1,  ip: "10.0.0.1",        host: "br-edge-01.webstorage.net",  asn: "AS263870", as: "Webstorage",      ms: 0.4,   ix: false },
+  { hop: 1,  ip: "10.0.0.1",        host: "br-edge-01.webstorage.com.br",  asn: "AS263870", as: "Webstorage",      ms: 0.4,   ix: false },
   { hop: 2,  ip: "187.16.220.1",    host: "border1.sp.telefonica.com",  asn: "AS12956",  as: "Telefônica",      ms: 1.8,   ix: false },
   { hop: 3,  ip: "200.219.130.45",  host: "sp.ptt.br",                  asn: "AS262332", as: "IX.br SP",        ms: 2.6,   ix: true  },
   { hop: 4,  ip: "200.219.130.118", host: "google-pe.sp.ptt.br",        asn: "AS262332", as: "IX.br SP",        ms: 2.9,   ix: true  },

@@ -150,15 +150,15 @@ function SmtpAlertsCard() {
     port: 587,
     user: "apikey",
     password: "SG.********************",
-    from: "noc@webstorage.net",
+    from: "suporte@webstorage.com.br",
     fromName: "fzBGPTools NOC",
     tls: "STARTTLS",
     enabled: true,
   });
   const [recipients, setRecipients] = useState([
-    { email: "noc@webstorage.net",       sev: ["CRITICAL", "ERROR"],          desc: "Plantão 24/7" },
-    { email: "peering@webstorage.net",   sev: ["CRITICAL", "ERROR", "WARN"],  desc: "Eventos BGP" },
-    { email: "infra-lead@webstorage.net",sev: ["CRITICAL"],                    desc: "Apenas críticos" },
+    { email: "suporte@webstorage.com.br",       sev: ["CRITICAL", "ERROR"],          desc: "Plantão 24/7" },
+    { email: "peering@webstorage.com.br",   sev: ["CRITICAL", "ERROR", "WARN"],  desc: "Eventos BGP" },
+    { email: "infra-lead@webstorage.com.br",sev: ["CRITICAL"],                    desc: "Apenas críticos" },
   ]);
   const [adding, setAdding] = useState(false);
   const [newEmail, setNewEmail] = useState({ email: "", sev: ["CRITICAL"], desc: "" });

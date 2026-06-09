@@ -12,8 +12,11 @@ automática de hosts em ranges CIDR**, **diagnóstico de rede** (ping/traceroute
 > Desenvolvido por **Eng. Roger Luft** • [roger@webstorage.com.br](mailto:roger@webstorage.com.br)
 > © **Webstorage Tecnologia** • Distribuído sob [CC BY 4.0](LICENSE)
 > Repositório de releases: [fzrepo.rogerluft.com.br](https://fzrepo.rogerluft.com.br)
+> **by Fazai tecnology group Roger Luft** (Veilwalker) & **Fernando Michel** (LickerMan)
 
 ---
+
+Recursos
 
 ## ✨ Recursos
 
